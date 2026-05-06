@@ -150,7 +150,171 @@
 </main>
 
 <script>
-// JS 在 Task 6 实现
+const uploadArea = document.getElementById('uploadArea');
+const fileInput = document.getElementById('fileInput');
+const preview = document.getElementById('preview');
+const uploadHint = document.getElementById('uploadHint');
+const errorDiv = document.getElementById('error');
+const statusParsing = document.getElementById('statusParsing');
+const statusEvaluating = document.getElementById('statusEvaluating');
+const resultDiv = document.getElementById('result');
+
+uploadArea.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', (e) => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+uploadArea.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  uploadArea.classList.add('dragover');
+});
+uploadArea.addEventListener('dragleave', () => {
+  uploadArea.classList.remove('dragover');
+});
+uploadArea.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadArea.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) handleFile(file);
+});
+
+async function handleFile(file) {
+  if (file.size > 10 * 1024 * 1024) {
+    showError('文件大小不能超过 10MB');
+    return;
+  }
+
+  hideError();
+  hideResult();
+
+  // Show preview
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    uploadHint.style.display = 'none';
+    uploadArea.classList.add('has-image');
+  };
+  reader.readAsDataURL(file);
+
+  try {
+    // Parse
+    showStatus('parsing');
+    const parseForm = new FormData();
+    parseForm.append('image', file);
+    const parseRes = await fetch('/api/parse', { method: 'POST', body: parseForm });
+    if (!parseRes.ok) {
+      const err = await parseRes.json();
+      throw new Error(err.error || '解析失败');
+    }
+    const { text } = await parseRes.json();
+
+    // Evaluate
+    hideStatus('parsing');
+    showStatus('evaluating');
+    const evalRes = await fetch('/api/evaluate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    if (!evalRes.ok) {
+      const err = await evalRes.json();
+      throw new Error(err.error || '评价失败');
+    }
+    const data = await evalRes.json();
+
+    hideStatus('evaluating');
+    renderResult(data);
+  } catch (err) {
+    hideStatus('parsing');
+    hideStatus('evaluating');
+    showError(err.message);
+  }
+}
+
+function showStatus(type) {
+  if (type === 'parsing') statusParsing.classList.add('visible');
+  if (type === 'evaluating') statusEvaluating.classList.add('visible');
+}
+function hideStatus(type) {
+  if (type === 'parsing') statusParsing.classList.remove('visible');
+  if (type === 'evaluating') statusEvaluating.classList.remove('visible');
+}
+
+function showError(msg) {
+  errorDiv.textContent = msg;
+  errorDiv.classList.add('visible');
+}
+function hideError() {
+  errorDiv.classList.remove('visible');
+}
+function hideResult() {
+  resultDiv.classList.remove('visible');
+}
+
+function renderResult(data) {
+  resultDiv.classList.add('visible');
+
+  // Score ring
+  const ring = document.getElementById('scoreRing');
+  ring.textContent = data.score + '分';
+  ring.className = 'score-ring';
+  if (data.score >= 70) ring.classList.add('score-high');
+  else if (data.score >= 40) ring.classList.add('score-moderate');
+  else ring.classList.add('score-low');
+
+  // Friendliness
+  const badge = document.getElementById('friendlinessBadge');
+  badge.className = 'friendliness-badge';
+  if (data.friendliness === 'high') {
+    badge.textContent = '\u{1F7E2} 减肥友好';
+    badge.classList.add('badge-high');
+  } else if (data.friendliness === 'moderate') {
+    badge.textContent = '\u{1F7E1} 适量食用';
+    badge.classList.add('badge-moderate');
+  } else {
+    badge.textContent = '\u{1F534} 建议避免';
+    badge.classList.add('badge-low');
+  }
+  document.getElementById('friendlinessReason').textContent = data.friendlinessReason || '';
+
+  // Warnings
+  const warningsList = document.getElementById('warningsList');
+  const noWarnings = document.getElementById('noWarnings');
+  warningsList.innerHTML = '';
+  if (data.warnings && data.warnings.length > 0) {
+    noWarnings.style.display = 'none';
+    data.warnings.forEach(w => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="warn-icon">⚠️</span><span>${escapeHtml(w)}</span>`;
+      warningsList.appendChild(li);
+    });
+  } else {
+    noWarnings.style.display = 'block';
+  }
+
+  // Ingredients
+  const ingredientsList = document.getElementById('ingredientsList');
+  ingredientsList.innerHTML = '';
+  (data.ingredients || []).forEach(ing => {
+    const div = document.createElement('div');
+    div.className = 'ingredient-item';
+    div.innerHTML = `
+      <div><span class="ingredient-name">${escapeHtml(ing.name)}</span><span class="ingredient-role">${escapeHtml(ing.role)}</span></div>
+      <div class="ingredient-note">${escapeHtml(ing.note)}</div>
+    `;
+    ingredientsList.appendChild(div);
+  });
+
+  // Scroll to result
+  resultDiv.scrollIntoView({ behavior: 'smooth' });
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
 </script>
 </body>
 </html>
