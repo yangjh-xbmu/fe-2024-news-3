@@ -1,13 +1,13 @@
 require('dotenv').config();
 const express = require('express');
-const path = require('path');
 
 const app = express();
 
 app.use(express.static(__dirname));
 
-const upload = require('multer')({
-  storage: require('multer').memoryStorage(),
+const multer = require('multer');
+const upload = multer({
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) return cb(null, true);
@@ -53,12 +53,15 @@ app.post('/api/parse', upload.single('image'), async (req, res) => {
 
     const { batch_id, file_urls } = batchData.data;
 
-    // Step 2: Upload file to signed URL
-    await fetch(file_urls[0], {
+    // Step 2: Upload file to signed URL (no Content-Type header per MinerU docs)
+    const uploadRes = await fetch(file_urls[0], {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/octet-stream' },
       body: req.file.buffer
     });
+    if (!uploadRes.ok) {
+      const body = await uploadRes.text().catch(() => '');
+      return res.status(502).json({ error: `Upload failed HTTP ${uploadRes.status}: ${body}` });
+    }
 
     // Step 3: Poll for completion (max 60s)
     let fullZipUrl;
@@ -103,7 +106,7 @@ app.post('/api/parse', upload.single('image'), async (req, res) => {
   }
 });
 
-app.post('/api/evaluate', express.json(), async (req, res) => {
+app.post('/api/evaluate', express.json({ limit: '100kb' }), async (req, res) => {
   try {
     if (!req.body.text) return res.status(400).json({ error: 'No text provided' });
 
