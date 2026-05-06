@@ -141,12 +141,21 @@ JSON字段说明：
       })
     });
 
+    if (!res2.ok) {
+      const body = await res2.text().catch(() => '');
+      return res.status(502).json({ error: `DeepSeek HTTP ${res2.status}: ${body}` });
+    }
     const data = await res2.json();
     if (!data.choices?.[0]?.message?.content) {
       return res.status(502).json({ error: 'DeepSeek API returned unexpected response' });
     }
 
-    const evaluation = JSON.parse(data.choices[0].message.content);
+    let evaluation;
+    try {
+      evaluation = JSON.parse(data.choices[0].message.content);
+    } catch {
+      return res.status(502).json({ error: 'Invalid JSON in DeepSeek response' });
+    }
     res.json(evaluation);
 
   } catch (err) {

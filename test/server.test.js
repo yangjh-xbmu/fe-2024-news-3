@@ -112,6 +112,7 @@ describe('Server', () => {
     global.fetch = async (url, options) => {
       if (url === 'https://api.deepseek.com/v1/chat/completions') {
         const body = JSON.parse(options.body);
+        assert.strictEqual(body.model, 'deepseek-chat');
         assert.ok(body.messages[0].content.includes('减肥'));
         return new Response(JSON.stringify({
           choices: [{
