@@ -105,4 +105,47 @@ describe('Server', () => {
       global.fetch = originalFetch;
     }
   });
+
+  it('should evaluate text via DeepSeek and return JSON', async () => {
+    const originalFetch = global.fetch;
+
+    global.fetch = async (url, options) => {
+      if (url === 'https://api.deepseek.com/v1/chat/completions') {
+        const body = JSON.parse(options.body);
+        assert.ok(body.messages[0].content.includes('减肥'));
+        return new Response(JSON.stringify({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                score: 65,
+                friendliness: 'moderate',
+                friendlinessReason: '含添加糖但整体可控',
+                warnings: ['白砂糖含量较高'],
+                ingredients: [
+                  { name: '小麦粉', role: '主食成分', note: '提供碳水化合物' }
+                ]
+              })
+            }
+          }]
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return originalFetch(url, options);
+    };
+
+    try {
+      const res = await fetch(`http://localhost:${PORT}/api/evaluate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: '小麦粉、白砂糖' })
+      });
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+      assert.strictEqual(data.score, 65);
+      assert.strictEqual(data.friendliness, 'moderate');
+      assert.ok(Array.isArray(data.warnings));
+      assert.ok(Array.isArray(data.ingredients));
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
 });
