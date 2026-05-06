@@ -8,7 +8,11 @@ app.use(express.static(__dirname));
 
 const upload = require('multer')({
   storage: require('multer').memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) return cb(null, true);
+    cb(new Error('Only image files are accepted'));
+  }
 });
 
 const AdmZip = require('adm-zip');
@@ -38,6 +42,10 @@ app.post('/api/parse', upload.single('image'), async (req, res) => {
       body: batchBody
     });
 
+    if (!batchRes.ok) {
+      const body = await batchRes.text().catch(() => '');
+      return res.status(502).json({ error: `MinerU HTTP ${batchRes.status}: ${body}` });
+    }
     const batchData = await batchRes.json();
     if (batchData.code !== 0) {
       return res.status(502).json({ error: `MinerU error: ${batchData.msg}` });
@@ -48,6 +56,7 @@ app.post('/api/parse', upload.single('image'), async (req, res) => {
     // Step 2: Upload file to signed URL
     await fetch(file_urls[0], {
       method: 'PUT',
+      headers: { 'Content-Type': 'application/octet-stream' },
       body: req.file.buffer
     });
 
@@ -59,7 +68,9 @@ app.post('/api/parse', upload.single('image'), async (req, res) => {
         `https://mineru.net/api/v4/extract-results/batch/${batch_id}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
-      const pollData = await pollRes.json();
+      if (!pollRes.ok) continue;
+      let pollData;
+      try { pollData = await pollRes.json(); } catch { continue; }
       if (pollData.code !== 0) continue;
       const result = pollData.data?.extract_result?.[0];
       if (result?.state === 'done') {
