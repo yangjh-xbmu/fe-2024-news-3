@@ -109,7 +109,7 @@
 
   <div class="error" id="error" aria-live="polite"></div>
 
-  <div class="upload-area" id="uploadArea">
+  <div class="upload-area" id="uploadArea" tabindex="0" role="button" aria-label="上传配料表图片">
     <img id="preview" style="display:none" alt="">
     <div id="uploadHint">
       <div style="font-size:2rem;margin-bottom:8px;">📷</div>
@@ -158,8 +158,12 @@ const errorDiv = document.getElementById('error');
 const statusParsing = document.getElementById('statusParsing');
 const statusEvaluating = document.getElementById('statusEvaluating');
 const resultDiv = document.getElementById('result');
+let isProcessing = false;
 
 uploadArea.addEventListener('click', () => fileInput.click());
+uploadArea.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+});
 fileInput.addEventListener('change', (e) => {
   if (e.target.files[0]) handleFile(e.target.files[0]);
 });
@@ -175,15 +179,22 @@ uploadArea.addEventListener('drop', (e) => {
   e.preventDefault();
   uploadArea.classList.remove('dragover');
   const file = e.dataTransfer.files[0];
-  if (file && file.type.startsWith('image/')) handleFile(file);
+  if (!file || !file.type.startsWith('image/')) {
+    showError('请上传图片文件（JPG、PNG、WebP）');
+    return;
+  }
+  handleFile(file);
 });
 
 async function handleFile(file) {
+  if (isProcessing) return;
   if (file.size > 10 * 1024 * 1024) {
     showError('文件大小不能超过 10MB');
     return;
   }
 
+  isProcessing = true;
+  fileInput.value = '';
   hideError();
   hideResult();
 
@@ -204,10 +215,12 @@ async function handleFile(file) {
     parseForm.append('image', file);
     const parseRes = await fetch('/api/parse', { method: 'POST', body: parseForm });
     if (!parseRes.ok) {
-      const err = await parseRes.json();
-      throw new Error(err.error || '解析失败');
+      let msg = '解析失败';
+      try { const err = await parseRes.json(); msg = err.error || msg; } catch {}
+      throw new Error(msg);
     }
-    const { text } = await parseRes.json();
+    const parseData = await parseRes.json();
+    if (!parseData.text) throw new Error('解析结果为空');
 
     // Evaluate
     hideStatus('parsing');
@@ -215,11 +228,12 @@ async function handleFile(file) {
     const evalRes = await fetch('/api/evaluate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text })
+      body: JSON.stringify({ text: parseData.text })
     });
     if (!evalRes.ok) {
-      const err = await evalRes.json();
-      throw new Error(err.error || '评价失败');
+      let msg = '评价失败';
+      try { const err = await evalRes.json(); msg = err.error || msg; } catch {}
+      throw new Error(msg);
     }
     const data = await evalRes.json();
 
@@ -229,6 +243,8 @@ async function handleFile(file) {
     hideStatus('parsing');
     hideStatus('evaluating');
     showError(err.message);
+  } finally {
+    isProcessing = false;
   }
 }
 
@@ -311,6 +327,7 @@ function renderResult(data) {
 }
 
 function escapeHtml(str) {
+  if (str == null) return '';
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
