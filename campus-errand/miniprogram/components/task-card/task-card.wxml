@@ -1,0 +1,11 @@
+<view class="task-card" bindtap="onTap">
+  <view class="task-header">
+    <text class="task-type">{{typeLabel}}</text>
+    <text class="task-reward">¥{{rewardText}}</text>
+  </view>
+  <view class="task-desc">{{description}}</view>
+  <view class="task-footer">
+    <text class="task-addr">📍 {{pickupName}} → 📍 {{deliveryName}}</text>
+    <text class="task-time">{{timeText}}</text>
+  </view>
+</view>

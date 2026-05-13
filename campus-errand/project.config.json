@@ -1,0 +1,11 @@
+{
+  "miniprogramRoot": "miniprogram/",
+  "cloudfunctionRoot": "cloudfunctions/",
+  "setting": {
+    "es6": true,
+    "minified": true,
+    "urlCheck": true
+  },
+  "appid": "{{your-appid}}",
+  "projectname": "campus-errand"
+}

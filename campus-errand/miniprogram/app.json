@@ -1,0 +1,43 @@
+{
+  "pages": [
+    "pages/tasks/tasks",
+    "pages/publish/publish",
+    "pages/detail/detail",
+    "pages/mine/mine",
+    "pages/review/review"
+  ],
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#07C160",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/tasks/tasks",
+        "text": "找任务",
+        "iconPath": "images/tab-tasks.png",
+        "selectedIconPath": "images/tab-tasks-active.png"
+      },
+      {
+        "pagePath": "pages/publish/publish",
+        "text": "发任务",
+        "iconPath": "images/tab-publish.png",
+        "selectedIconPath": "images/tab-publish-active.png"
+      },
+      {
+        "pagePath": "pages/mine/mine",
+        "text": "我的",
+        "iconPath": "images/tab-mine.png",
+        "selectedIconPath": "images/tab-mine-active.png"
+      }
+    ]
+  },
+  "window": {
+    "navigationBarBackgroundColor": "#FFFFFF",
+    "navigationBarTitleText": "校园跑腿",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F5F5F5"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}
